@@ -1,0 +1,128 @@
+import json
+import re
+
+def clean_string(text):
+    """
+    Làm sạch chuỗi khỏi các ký tự đặc biệt như \n, \, ".
+    
+    Args:
+        text (str): Chuỗi cần làm sạch.
+    
+    Returns:
+        str: Chuỗi đã được làm sạch.
+    """
+    # Loại bỏ ký tự \n
+    cleaned_text = text.replace('\n', ' ')
+    # Loại bỏ các ký tự đặc biệt khác
+    cleaned_text = re.sub(r'\\|\"', '', cleaned_text)
+    return cleaned_text.strip()
+
+def clean_json_data(data):
+    """
+    Đệ quy làm sạch dữ liệu JSON bằng cách xử lý từng chuỗi.
+    
+    Args:
+        data (dict or list or str): Dữ liệu JSON cần làm sạch.
+    
+    Returns:
+        dict or list or str: Dữ liệu đã được làm sạch.
+    """
+    if isinstance(data, dict):
+        return {key: clean_json_data(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [clean_json_data(item) for item in data]
+    elif isinstance(data, str):
+        return clean_string(data)
+    else:
+        return data
+
+def add_source_field(data, source_value):
+    """
+    Thêm trường 'source' vào mỗi đối tượng trong dữ liệu JSON.
+    
+    Args:
+        data (dict or list): Dữ liệu JSON cần thêm trường 'source'.
+        source_value (str): Giá trị của trường 'source'.
+    
+    Returns:
+        dict or list: Dữ liệu đã được thêm trường 'source'.
+    """
+    if isinstance(data, list):
+        for item in data:
+            if isinstance(item, dict):
+                item["source"] = source_value
+    elif isinstance(data, dict):
+        data["source"] = source_value
+    return data
+
+def process_json_file(input_file, cleaned_file, source_value):
+    """
+    Xử lý file JSON: làm sạch dữ liệu và thêm trường 'source'.
+    
+    Args:
+        input_file (str): Đường dẫn đến file JSON gốc.
+        cleaned_file (str): Đường dẫn đến file JSON đã được làm sạch.
+        source_value (str): Giá trị của trường 'source' cần thêm.
+    """
+    try:
+        # Đọc dữ liệu từ file JSON gốc
+        with open(input_file, 'r', encoding='utf-8') as infile:
+            data = json.load(infile)
+        
+        # Làm sạch dữ liệu
+        cleaned_data = clean_json_data(data)
+        
+        # Thêm trường 'source'
+        data_with_source = add_source_field(cleaned_data, source_value)
+        
+        # Ghi dữ liệu đã xử lý vào file mới
+        with open(cleaned_file, 'w', encoding='utf-8') as outfile:
+            json.dump(data_with_source, outfile, ensure_ascii=False, indent=4)
+        
+        print(f"Đã làm sạch và thêm trường 'source' vào {cleaned_file}")
+    except Exception as e:
+        print(f"Lỗi khi xử lý file {input_file}: {e}")
+
+def merge_json_files(file1, file2, output_file):
+    """
+    Nối hai file JSON lại với nhau.
+    
+    Args:
+        file1 (str): Đường dẫn đến file JSON thứ nhất.
+        file2 (str): Đường dẫn đến file JSON thứ hai.
+        output_file (str): Đường dẫn đến file JSON đầu ra sau khi nối.
+    """
+    try:
+        # Đọc dữ liệu từ hai file JSON
+        with open(file1, 'r', encoding='utf-8') as f1, open(file2, 'r', encoding='utf-8') as f2:
+            data1 = json.load(f1)
+            data2 = json.load(f2)
+        
+        # Kiểm tra kiểu dữ liệu và nối tương ứng
+        if isinstance(data1, list) and isinstance(data2, list):
+            merged_data = data1 + data2
+        elif isinstance(data1, dict) and isinstance(data2, dict):
+            merged_data = {**data1, **data2}
+        else:
+            raise ValueError("Hai file JSON phải cùng kiểu dữ liệu (list hoặc dict)")
+        
+        # Ghi dữ liệu nối vào file đầu ra
+        with open(output_file, 'w', encoding='utf-8') as outfile:
+            json.dump(merged_data, outfile, ensure_ascii=False, indent=4)
+        
+        print(f"Đã nối dữ liệu từ {file1} và {file2} vào {output_file}")
+    except Exception as e:
+        print(f"Lỗi khi nối file: {e}")
+
+# Ví dụ sử dụng các hàm
+if __name__ == "__main__":
+    # Xử lý file1.json với source 'cafebiz'
+    process_json_file('/Users/datarist/EconVNNewsCrawl/tests/sample_tests/cafebizcrawler_articles_2024-01-01_2024-01-01.json', 
+                      '/Users/datarist/EconVNNewsCrawl/preprocessing/data/cafebizcrawler_articles_2024-01-01_2024-01-01_cleaned.json', 
+                      'cafebiz')
+    
+    # # Xử lý file2.json với source 'vnexpress'
+    # process_json_file('file2.json', 'cleaned_file2.json', 'vnexpress')
+    
+    # # Nối hai file đã được làm sạch và thêm source
+    # merge_json_files('cleaned_file1.json', 'cleaned_file2.json', 'merged_output.json')
